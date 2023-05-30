@@ -18,6 +18,7 @@ namespace Server
         static Socket listenfd;
         static Dictionary<Socket, ClientState> clients = new Dictionary<Socket, ClientState>();
 
+        static VITS vitsCmd;
         static string dicPath;
         static string modelPath = "\\AudioConfig\\keqing.pth";
         static string configPath = "\\AudioConfig\\config.json";
@@ -36,16 +37,14 @@ namespace Server
 #else
             prefix = path.Parent.FullName;
 #endif
-            Console.WriteLine(prefix + modelPath);
-            var p = prefix + testPath;
-            string[] files = File.ReadAllLines(p, Encoding.UTF8);
-            foreach (string file in files)
-            {
-                Console.WriteLine(file);
-            }
+            //Console.WriteLine(prefix + modelPath);
+            //var p = prefix + testPath;
+            //string[] files = File.ReadAllLines(p, Encoding.UTF8);
+            //foreach (string file in files)
+            //{
+            //    Console.WriteLine(file);
+            //}
         }
-
-        static VITS vitsCmd;
 
         private static void InitVITS()
         {
@@ -130,18 +129,50 @@ namespace Server
         static void Main(string[] args)
         {
             //string message = "Repeat t 你好，我是牧濑红莉牺，是你的助手。很高兴见到你，从今往后，请多多关照。 87";
-            string exitMessage = "Exit";
-            LoadConfig();
-            InitVITS();
+            //string exitMessage = "Exit";
+            //LoadConfig();
+            //InitVITS();
             //HandleInput(message);
-            HandleInput(exitMessage);
-            //NetWork();
+            //HandleInput(exitMessage);
+            NetWork();
             Console.ReadLine();
         }
 
         private static void VITSOUT(VITS sender, string e)
         {
             Console.WriteLine(e);
+        }
+
+        //fragmentSize = 4096 不行， 会出现拆成了 4 个 1024
+
+        static int fragmentSize = 1024;
+
+        static void SendAudio(string AudioPath, Socket clientfd)
+        {
+            using (FileStream fileStream = File.OpenRead(AudioPath))
+            {
+                fileStream.Seek(44, SeekOrigin.Begin);
+                int dataSize = (int)(fileStream.Length - 44);
+                int fragmentNum = dataSize / fragmentSize;
+
+                if(dataSize%fragmentSize != 0) { ++fragmentNum; } //要分成多少片呢？
+
+                // 创建缓冲区用于存储数据块
+                byte[] buffer = new byte[fragmentSize];
+                int bytesRead;
+                int i = 1;
+                byte[] Start = Encoding.UTF8.GetBytes("Start " + fragmentNum.ToString() + " " + dataSize.ToString());
+                clientfd.Send(Start, Start.Length, SocketFlags.None);
+                Console.WriteLine(Start);
+                // 逐个读取数据块并发送到服务器
+                while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    Console.WriteLine($"第 {i} 次 发送"); ++i;
+                    clientfd.Send(buffer, bytesRead, SocketFlags.None);
+                }
+                byte[] Over = Encoding.UTF8.GetBytes("Over");
+                clientfd.Send(Over, Over.Length, SocketFlags.None);
+            }
         }
 
         private static void NetWork()
@@ -193,6 +224,9 @@ namespace Server
             ClientState state = new ClientState();
             state.socket = clientfd;
             clients.Add(clientfd, state);
+            Console.WriteLine("Ready to Send  Audio");
+            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\很高兴见到你，从今往.wav", clientfd);
+            Console.WriteLine("Send Over!");
         }
 
         public static bool ReadClientfd(Socket clientfd)
