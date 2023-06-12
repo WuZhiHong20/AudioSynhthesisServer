@@ -4,6 +4,7 @@ using System.Text;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Channels;
 
 namespace Server
 {
@@ -46,6 +47,9 @@ namespace Server
             //}
         }
 
+        /// <summary>
+        /// 服务器一启动 就 启动VITS
+        /// </summary>
         private static void InitVITS()
         {
             vitsCmd = new VITS();
@@ -83,6 +87,9 @@ namespace Server
             //Console.WriteLine(Path);
         }
 
+        /// <summary>
+        /// 客户端退出的时候才会退出VITS
+        /// </summary>
         static void StartExit()
         {
             if (talken == false)
@@ -147,31 +154,61 @@ namespace Server
 
         static int fragmentSize = 1024;
 
+        private static void getAudioInfo(FileStream fs)
+        {
+            // 读取采样率
+            fs.Seek(24, SeekOrigin.Begin);
+            byte[] sampleRateBytes = new byte[4];
+            fs.Read(sampleRateBytes, 0, 4);
+            int sampleRate = BitConverter.ToInt32(sampleRateBytes, 0);
+
+            // 读取声道数
+            fs.Seek(22, SeekOrigin.Begin);
+            byte[] channelsBytes = new byte[2];
+            fs.Read(channelsBytes, 0, 2);
+            int channels = BitConverter.ToInt16(channelsBytes, 0);
+
+            // 读取位深
+            fs.Seek(34, SeekOrigin.Begin);
+            byte[] bitDepthBytes = new byte[2];
+            fs.Read(bitDepthBytes, 0, 2);
+            int bitDepth = BitConverter.ToInt16(bitDepthBytes, 0);
+            Console.WriteLine($"采样率为{sampleRate}  声道数为 {channels}   位深为{bitDepth}");
+        }
+
         static void SendAudio(string AudioPath, Socket clientfd)
         {
             using (FileStream fileStream = File.OpenRead(AudioPath))
             {
-                fileStream.Seek(44, SeekOrigin.Begin);
-                int dataSize = (int)(fileStream.Length - 44);
+                getAudioInfo(fileStream);
+                //fileStream.Seek(44, SeekOrigin.Begin);
+                //int dataSize = (int)(fileStream.Length - 44);
+
+                fileStream.Seek(54, SeekOrigin.Begin);
+                int dataSize = (int)(fileStream.Length - 54);
                 int fragmentNum = dataSize / fragmentSize;
 
                 if(dataSize%fragmentSize != 0) { ++fragmentNum; } //要分成多少片呢？
+
+                Console.WriteLine($"一共要发送{fragmentNum}次");
 
                 // 创建缓冲区用于存储数据块
                 byte[] buffer = new byte[fragmentSize];
                 int bytesRead;
                 int i = 1;
-                byte[] Start = Encoding.UTF8.GetBytes("Start " + fragmentNum.ToString() + " " + dataSize.ToString());
-                clientfd.Send(Start, Start.Length, SocketFlags.None);
-                Console.WriteLine(Start);
+                //byte[] Start = Encoding.UTF8.GetBytes("Start " + fragmentNum.ToString() + " " + dataSize.ToString());
+                //clientfd.Send(Start, Start.Length, SocketFlags.None);
+                //Console.WriteLine(Start);
                 // 逐个读取数据块并发送到服务器
                 while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
-                    Console.WriteLine($"第 {i} 次 发送"); ++i;
+                    //Console.WriteLine($"第 {i} 次 发送 {bytesRead} bytes"); ++i;
                     clientfd.Send(buffer, bytesRead, SocketFlags.None);
+                    Array.Clear(buffer, 0, buffer.Length );
                 }
-                byte[] Over = Encoding.UTF8.GetBytes("Over");
-                clientfd.Send(Over, Over.Length, SocketFlags.None);
+                //byte[] Over = Encoding.UTF8.GetBytes("Over");
+                //clientfd.Send(Over, Over.Length, SocketFlags.None);
+                //Console.WriteLine($"一共发送了{dataSize}个bytes");
             }
         }
 
@@ -225,7 +262,7 @@ namespace Server
             state.socket = clientfd;
             clients.Add(clientfd, state);
             Console.WriteLine("Ready to Send  Audio");
-            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\很高兴见到你，从今往.wav", clientfd);
+            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\你好，我是牧濑红莉牺.wav", clientfd);
             Console.WriteLine("Send Over!");
         }
 
@@ -259,6 +296,8 @@ namespace Server
             byte[] sendBytes = System.Text.Encoding.Default.GetBytes(sendStr);
             clientfd.BeginSend(sendBytes, 0, sendBytes.Length, 0, SendCallBack, clientfd);
             Console.WriteLine("Server wana send " + sendStr);
+
+            HandleInput(recvStr);
             return true;
         }
 
