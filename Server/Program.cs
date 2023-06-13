@@ -264,7 +264,7 @@ namespace Server
             state.socket = clientfd;
             clients.Add(clientfd, state);
             Console.WriteLine("Ready to Send  Audio");
-            //SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\你好，我是牧濑红莉牺.wav", clientfd);
+            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\你好，我是牧濑红莉牺.wav", clientfd);
             SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\很高兴见到你，从今往.wav", clientfd);
             Console.WriteLine("Send Over!");
         }
