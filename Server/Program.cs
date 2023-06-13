@@ -181,16 +181,18 @@ namespace Server
             using (FileStream fileStream = File.OpenRead(AudioPath))
             {
                 getAudioInfo(fileStream);
-                //fileStream.Seek(44, SeekOrigin.Begin);
-                //int dataSize = (int)(fileStream.Length - 44);
 
                 fileStream.Seek(54, SeekOrigin.Begin);
-                int dataSize = (int)(fileStream.Length - 54);
-                int fragmentNum = dataSize / fragmentSize;
+                long dataSize = (fileStream.Length - 54);
+                long fragmentNum = dataSize / fragmentSize;
 
                 if(dataSize%fragmentSize != 0) { ++fragmentNum; } //要分成多少片呢？
 
                 Console.WriteLine($"一共要发送{fragmentNum}次");
+
+                byte[] messagePrefix = BitConverter.GetBytes(dataSize);
+                Console.WriteLine($"一共要发送音频内容{dataSize}个字节,首部长度为{messagePrefix.Length}");
+                clientfd.Send(messagePrefix, messagePrefix.Length, SocketFlags.None);
 
                 // 创建缓冲区用于存储数据块
                 byte[] buffer = new byte[fragmentSize];
@@ -262,7 +264,8 @@ namespace Server
             state.socket = clientfd;
             clients.Add(clientfd, state);
             Console.WriteLine("Ready to Send  Audio");
-            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\你好，我是牧濑红莉牺.wav", clientfd);
+            //SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\你好，我是牧濑红莉牺.wav", clientfd);
+            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\很高兴见到你，从今往.wav", clientfd);
             Console.WriteLine("Send Over!");
         }
 
