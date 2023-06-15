@@ -17,6 +17,7 @@ namespace Server
     internal class Program
     {
         static Socket listenfd;
+        static Socket CLfd;
         static Dictionary<Socket, ClientState> clients = new Dictionary<Socket, ClientState>();
 
         static VITS vitsCmd;
@@ -28,6 +29,8 @@ namespace Server
         static string testPath = "\\AudioConfig\\config.txt";
         static string savePath = "\\Audios\\";
         static bool talken = false;
+
+        static List<string> PathList = new List<string>(); 
 
         static void LoadConfig()
         {
@@ -84,6 +87,10 @@ namespace Server
 
             Path = Path + "\\" + fileName + ".wav";
             vitsCmd.Write(Path);
+
+            Console.WriteLine("\n" + Path + "\n");
+            PathList.Add(Path);
+
             //Console.WriteLine(Path);
         }
 
@@ -99,12 +106,15 @@ namespace Server
                 vitsCmd.Write("87");
                 vitsCmd.Write(prefix + savePath + "再见喽.wav");
                 vitsCmd.Write("n");
+                Console.WriteLine("一次都没合成过，真遗憾");
             }
             else
             {
                 vitsCmd.Write("n");
                 Console.WriteLine("从这儿走...");
             }
+            CLfd.Close();
+            listenfd.Close();
         }
 
         static void HandleInput(string input)
@@ -114,7 +124,8 @@ namespace Server
             {
                 StartExit();
                 Thread.Sleep(5000);
-                return;
+                Console.WriteLine("Server Exit...");
+                Environment.Exit(0);
             }
             string[] strs = commands[2].Split("。");
             int i = 0;
@@ -123,6 +134,7 @@ namespace Server
 
             var files = Directory.GetFiles(dicPath);
             var Path = dicPath + "\\" + files.Length.ToString();
+
             if (!Directory.Exists(Path))
             {
                 Directory.CreateDirectory(Path);
@@ -137,8 +149,8 @@ namespace Server
         {
             //string message = "Repeat t 你好，我是牧濑红莉牺，是你的助手。很高兴见到你，从今往后，请多多关照。 87";
             //string exitMessage = "Exit";
-            //LoadConfig();
-            //InitVITS();
+            LoadConfig();
+            InitVITS();
             //HandleInput(message);
             //HandleInput(exitMessage);
             NetWork();
@@ -148,6 +160,15 @@ namespace Server
         private static void VITSOUT(VITS sender, string e)
         {
             Console.WriteLine(e);
+            Console.WriteLine("VITS 进行了一次输出,内容是 " + e);
+            if(e.Contains("Successfully saved") == true)
+            {
+                if(CLfd != null && PathList.Count > 0)
+                {
+                    SendAudio(PathList[0], CLfd);
+                    PathList.RemoveAt(0);
+                }
+            }
         }
 
         //fragmentSize = 4096 不行， 会出现拆成了 4 个 1024
@@ -263,10 +284,11 @@ namespace Server
             ClientState state = new ClientState();
             state.socket = clientfd;
             clients.Add(clientfd, state);
-            Console.WriteLine("Ready to Send  Audio");
-            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\你好，我是牧濑红莉牺.wav", clientfd);
-            SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\很高兴见到你，从今往.wav", clientfd);
-            Console.WriteLine("Send Over!");
+            CLfd = clientfd;
+            //Console.WriteLine("Ready to Send  Audio");
+            //SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\你好，我是牧濑红莉牺.wav", clientfd);
+            //SendAudio(@"D:\ChatWife\_chatAssistant\Audios\2023_5_29\0\很高兴见到你，从今往.wav", clientfd);
+            //Console.WriteLine("Send Over!");
         }
 
         public static bool ReadClientfd(Socket clientfd)
@@ -295,11 +317,10 @@ namespace Server
             Console.WriteLine("Server Receive " + recvStr);
             
             //回复
-            string sendStr = clientfd.RemoteEndPoint.ToString() + " : " + recvStr;
-            byte[] sendBytes = System.Text.Encoding.Default.GetBytes(sendStr);
-            clientfd.BeginSend(sendBytes, 0, sendBytes.Length, 0, SendCallBack, clientfd);
-            Console.WriteLine("Server wana send " + sendStr);
-
+            //string sendStr = clientfd.RemoteEndPoint.ToString() + " : " + recvStr;
+            //byte[] sendBytes = System.Text.Encoding.Default.GetBytes(sendStr);
+            //clientfd.BeginSend(sendBytes, 0, sendBytes.Length, 0, SendCallBack, clientfd);
+            //Console.WriteLine("Server wana send " + sendStr);
             HandleInput(recvStr);
             return true;
         }
